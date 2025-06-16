@@ -48,7 +48,7 @@ show_help() {
 # Function to show version
 show_version() {
     echo "FileCleanupTool.bash version 1.0"
-    echo "Ubuntu 22.04+ 用大容量ファイル整理ツール"
+    echo "Large File Cleanup Tool for Ubuntu 22.04+"
 }
 
 # Function to load configuration
@@ -82,7 +82,7 @@ save_config() {
 }
 EOF
     
-    print_colored "$GREEN" "設定を保存しました: $CONFIG_FILE"
+    print_colored "$GREEN" "Configuration saved: $CONFIG_FILE"
 }
 
 # Function to convert size to bytes for comparison
@@ -117,15 +117,15 @@ format_file_size() {
 get_target_folder() {
     while true; do
         echo ""
-        print_colored "$BLUE" "検索対象フォルダを選択してください:"
-        echo "前回の選択: $LAST_FOLDER"
+        print_colored "$BLUE" "Please select target folder:"
+        echo "Previous selection: $LAST_FOLDER"
         echo ""
-        echo "1) 前回と同じフォルダを使用 ($LAST_FOLDER)"
-        echo "2) ホームディレクトリ ($HOME)"
-        echo "3) カスタムパスを入力"
-        echo "4) 終了"
+        echo "1) Use previous folder ($LAST_FOLDER)"
+        echo "2) Home directory ($HOME)"
+        echo "3) Enter custom path"
+        echo "4) Exit"
         echo ""
-        read -p "選択 [1-4]: " choice
+        read -p "Choice [1-4]: " choice
         
         case $choice in
             1)
@@ -133,7 +133,7 @@ get_target_folder() {
                     echo "$LAST_FOLDER"
                     return 0
                 else
-                    print_colored "$RED" "エラー: フォルダが存在しません: $LAST_FOLDER"
+                    print_colored "$RED" "Error: Folder does not exist: $LAST_FOLDER"
                 fi
                 ;;
             2)
@@ -141,20 +141,20 @@ get_target_folder() {
                 return 0
                 ;;
             3)
-                read -p "検索対象フォルダのパスを入力: " custom_path
+                read -p "Enter target folder path: " custom_path
                 if [[ -d "$custom_path" ]]; then
                     echo "$custom_path"
                     return 0
                 else
-                    print_colored "$RED" "エラー: フォルダが存在しません: $custom_path"
+                    print_colored "$RED" "Error: Folder does not exist: $custom_path"
                 fi
                 ;;
             4)
-                print_colored "$YELLOW" "プログラムを終了します。"
+                print_colored "$YELLOW" "Exiting program."
                 exit 0
                 ;;
             *)
-                print_colored "$RED" "無効な選択です。1-4を選んでください。"
+                print_colored "$RED" "Invalid choice. Please select 1-4."
                 ;;
         esac
     done
@@ -164,17 +164,17 @@ get_target_folder() {
 get_size_threshold() {
     while true; do
         echo ""
-        print_colored "$BLUE" "検索するファイルサイズの閾値を選択してください:"
-        echo "前回の選択: $LAST_SIZE_THRESHOLD"
+        print_colored "$BLUE" "Please select file size threshold:"
+        echo "Previous selection: $LAST_SIZE_THRESHOLD"
         echo ""
-        echo "1) 50MB以上"
-        echo "2) 100MB以上 (推奨)"
-        echo "3) 500MB以上"
-        echo "4) 1GB以上"
-        echo "5) カスタムサイズを入力"
-        echo "6) 前回と同じ閾値を使用 ($LAST_SIZE_THRESHOLD)"
+        echo "1) 50MB or larger"
+        echo "2) 100MB or larger (recommended)"
+        echo "3) 500MB or larger"
+        echo "4) 1GB or larger"
+        echo "5) Enter custom size"
+        echo "6) Use previous threshold ($LAST_SIZE_THRESHOLD)"
         echo ""
-        read -p "選択 [1-6]: " choice
+        read -p "Choice [1-6]: " choice
         
         case $choice in
             1) echo "50M"; return 0 ;;
@@ -182,17 +182,17 @@ get_size_threshold() {
             3) echo "500M"; return 0 ;;
             4) echo "1G"; return 0 ;;
             5)
-                read -p "カスタムサイズを入力 (例: 200M, 2G): " custom_size
+                read -p "Enter custom size (e.g., 200M, 2G): " custom_size
                 if [[ "$custom_size" =~ ^[0-9]+[MmGgKk]?$ ]]; then
                     echo "$custom_size"
                     return 0
                 else
-                    print_colored "$RED" "無効なサイズ形式です。例: 200M, 2G"
+                    print_colored "$RED" "Invalid size format. Examples: 200M, 2G"
                 fi
                 ;;
             6) echo "$LAST_SIZE_THRESHOLD"; return 0 ;;
             *)
-                print_colored "$RED" "無効な選択です。1-6を選んでください。"
+                print_colored "$RED" "Invalid choice. Please select 1-6."
                 ;;
         esac
     done
@@ -205,9 +205,9 @@ search_files() {
     local temp_file
     temp_file=$(mktemp)
     
-    print_colored "$YELLOW" "ファイル検索を開始します..."
-    print_colored "$BLUE" "対象フォルダ: $target_folder"
-    print_colored "$BLUE" "サイズ閾値: $size_threshold"
+    print_colored "$YELLOW" "Starting file search..."
+    print_colored "$BLUE" "Target folder: $target_folder"
+    print_colored "$BLUE" "Size threshold: $size_threshold"
     echo ""
     
     # Reset found files array
@@ -225,16 +225,16 @@ search_files() {
     local count=0
     while kill -0 $search_pid 2>/dev/null; do
         case $((count % 4)) in
-            0) printf "\r検索中 |   " ;;
-            1) printf "\r検索中 /   " ;;
-            2) printf "\r検索中 -   " ;;
-            3) printf "\r検索中 \\   " ;;
+            0) printf "\rSearching |   " ;;
+            1) printf "\rSearching /   " ;;
+            2) printf "\rSearching -   " ;;
+            3) printf "\rSearching \\   " ;;
         esac
         ((count++))
         sleep 0.1
     done
     wait $search_pid
-    printf "\r検索完了!    \n"
+    printf "\rSearch complete!    \n"
     
     # Read results into array
     local line_count=0
@@ -247,20 +247,20 @@ search_files() {
     
     rm -f "$temp_file"
     
-    print_colored "$GREEN" "検索結果: ${#FOUND_FILES[@]} 個のファイルが見つかりました"
+    print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found"
     echo ""
 }
 
 # Function to display found files
 display_files() {
     if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
-        print_colored "$YELLOW" "条件に合うファイルが見つかりませんでした。"
+        print_colored "$YELLOW" "No files found matching the criteria."
         return 1
     fi
     
-    echo "見つかったファイル一覧:"
+    echo "Found files list:"
     echo "----------------------------------------"
-    printf "%-3s %-10s %-19s %s\n" "No" "サイズ" "更新日時" "ファイルパス"
+    printf "%-3s %-10s %-19s %s\n" "No" "Size" "Modified" "File Path"
     echo "----------------------------------------"
     
     local i=1
@@ -286,55 +286,55 @@ select_files() {
     
     while true; do
         echo ""
-        print_colored "$BLUE" "ファイル選択メニュー:"
-        echo "1) 個別ファイル選択/選択解除"
-        echo "2) 全選択"
-        echo "3) 全解除"
-        echo "4) 選択したファイルを表示"
-        echo "5) 選択したファイルを削除実行"
-        echo "6) メインメニューに戻る"
+        print_colored "$BLUE" "File selection menu:"
+        echo "1) Select/deselect individual files"
+        echo "2) Select all"
+        echo "3) Deselect all"
+        echo "4) Show selected files"
+        echo "5) Delete selected files"
+        echo "6) Return to main menu"
         echo ""
         
         if [[ ${#selected_indices[@]} -gt 0 ]]; then
-            print_colored "$GREEN" "現在 ${#selected_indices[@]} 個のファイルが選択されています"
+            print_colored "$GREEN" "Currently ${#selected_indices[@]} files are selected"
         fi
         
-        read -p "選択 [1-6]: " choice
+        read -p "Choice [1-6]: " choice
         
         case $choice in
             1)
                 echo ""
-                read -p "ファイル番号を入力 (1-${#FOUND_FILES[@]}): " file_num
+                read -p "Enter file number (1-${#FOUND_FILES[@]}): " file_num
                 if [[ "$file_num" =~ ^[0-9]+$ ]] && (( file_num >= 1 && file_num <= ${#FOUND_FILES[@]} )); then
                     # Toggle selection
                     local index=$((file_num - 1))
                     if [[ " ${selected_indices[*]} " =~ " ${index} " ]]; then
                         # Remove from selection
                         selected_indices=(${selected_indices[@]/$index})
-                        print_colored "$YELLOW" "ファイル $file_num の選択を解除しました"
+                        print_colored "$YELLOW" "Deselected file $file_num"
                     else
                         # Add to selection
                         selected_indices+=("$index")
-                        print_colored "$GREEN" "ファイル $file_num を選択しました"
+                        print_colored "$GREEN" "Selected file $file_num"
                     fi
                 else
-                    print_colored "$RED" "無効なファイル番号です"
+                    print_colored "$RED" "Invalid file number"
                 fi
                 ;;
             2)
                 selected_indices=($(seq 0 $((${#FOUND_FILES[@]} - 1))))
-                print_colored "$GREEN" "全ファイルを選択しました (${#FOUND_FILES[@]} 個)"
+                print_colored "$GREEN" "Selected all files (${#FOUND_FILES[@]} files)"
                 ;;
             3)
                 selected_indices=()
-                print_colored "$YELLOW" "全選択を解除しました"
+                print_colored "$YELLOW" "Deselected all files"
                 ;;
             4)
                 if [[ ${#selected_indices[@]} -eq 0 ]]; then
-                    print_colored "$YELLOW" "選択されたファイルはありません"
+                    print_colored "$YELLOW" "No files are selected"
                 else
                     echo ""
-                    echo "選択されたファイル:"
+                    echo "Selected files:"
                     echo "----------------------------------------"
                     local total_size=0
                     for index in "${selected_indices[@]}"; do
@@ -348,12 +348,12 @@ select_files() {
                     echo "----------------------------------------"
                     local total_human_size
                     total_human_size=$(format_file_size "$total_size")
-                    print_colored "$GREEN" "合計サイズ: $total_human_size"
+                    print_colored "$GREEN" "Total size: $total_human_size"
                 fi
                 ;;
             5)
                 if [[ ${#selected_indices[@]} -eq 0 ]]; then
-                    print_colored "$RED" "削除するファイルが選択されていません"
+                    print_colored "$RED" "No files selected for deletion"
                 else
                     delete_selected_files "${selected_indices[@]}"
                     return 0
@@ -363,7 +363,7 @@ select_files() {
                 return 0
                 ;;
             *)
-                print_colored "$RED" "無効な選択です。1-6を選んでください。"
+                print_colored "$RED" "Invalid choice. Please select 1-6."
                 ;;
         esac
     done
@@ -385,9 +385,9 @@ delete_selected_files() {
     
     # Show confirmation
     echo ""
-    print_colored "$YELLOW" "削除確認"
+    print_colored "$YELLOW" "Delete confirmation"
     echo "----------------------------------------"
-    print_colored "$RED" "以下の ${#SELECTED_FILES[@]} 個のファイルをごみ箱に移動します:"
+    print_colored "$RED" "The following ${#SELECTED_FILES[@]} files will be moved to trash:"
     
     for filepath in "${SELECTED_FILES[@]}"; do
         echo "  $filepath"
@@ -396,24 +396,24 @@ delete_selected_files() {
     local total_human_size
     total_human_size=$(format_file_size "$total_size")
     echo "----------------------------------------"
-    print_colored "$BLUE" "合計削除サイズ: $total_human_size"
+    print_colored "$BLUE" "Total deletion size: $total_human_size"
     echo ""
     
-    read -p "本当に削除しますか？ (y/N): " confirm
+    read -p "Are you sure you want to delete? (y/N): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         local success_count=0
         local error_count=0
         
-        print_colored "$YELLOW" "ファイルをごみ箱に移動しています..."
+        print_colored "$YELLOW" "Moving files to trash..."
         
         for filepath in "${SELECTED_FILES[@]}"; do
             if command -v gio >/dev/null 2>&1; then
                 if gio trash "$filepath" 2>/dev/null; then
                     ((success_count++))
-                    print_colored "$GREEN" "移動完了: $(basename "$filepath")"
+                    print_colored "$GREEN" "Move completed: $(basename "$filepath")"
                 else
                     ((error_count++))
-                    print_colored "$RED" "移動失敗: $filepath"
+                    print_colored "$RED" "Move failed: $filepath"
                 fi
             else
                 # Fallback: move to a trash directory
@@ -421,22 +421,22 @@ delete_selected_files() {
                 mkdir -p "$trash_dir"
                 if mv "$filepath" "$trash_dir/" 2>/dev/null; then
                     ((success_count++))
-                    print_colored "$GREEN" "移動完了: $(basename "$filepath")"
+                    print_colored "$GREEN" "Move completed: $(basename "$filepath")"
                 else
                     ((error_count++))
-                    print_colored "$RED" "移動失敗: $filepath"
+                    print_colored "$RED" "Move failed: $filepath"
                 fi
             fi
         done
         
         echo ""
-        print_colored "$GREEN" "削除操作完了!"
-        print_colored "$BLUE" "成功: $success_count 個"
+        print_colored "$GREEN" "Delete operation completed!"
+        print_colored "$BLUE" "Success: $success_count files"
         if [[ $error_count -gt 0 ]]; then
-            print_colored "$RED" "失敗: $error_count 個"
+            print_colored "$RED" "Failed: $error_count files"
         fi
     else
-        print_colored "$YELLOW" "削除操作をキャンセルしました。"
+        print_colored "$YELLOW" "Delete operation cancelled."
     fi
 }
 
@@ -465,8 +465,8 @@ main() {
     done
     
     if [[ ${#missing_commands[@]} -gt 0 ]]; then
-        print_colored "$RED" "エラー: 必要なコマンドが見つかりません: ${missing_commands[*]}"
-        print_colored "$BLUE" "インストール: sudo apt update && sudo apt install findutils bc"
+        print_colored "$RED" "Error: Required commands not found: ${missing_commands[*]}"
+        print_colored "$BLUE" "Install with: sudo apt update && sudo apt install findutils bc"
         exit 1
     fi
     
@@ -474,8 +474,8 @@ main() {
     load_config
     
     # Main program loop
-    print_colored "$GREEN" "大容量ファイル整理スクリプト for Linux"
-    print_colored "$BLUE" "Ubuntu 22.04+ 用ディスククリーンアップツール"
+    print_colored "$GREEN" "Large File Cleanup Script for Linux"
+    print_colored "$BLUE" "Disk Cleanup Tool for Ubuntu 22.04+"
     echo ""
     
     while true; do
@@ -501,13 +501,13 @@ main() {
         
         # Ask if user wants to continue
         echo ""
-        read -p "別の検索を実行しますか？ (y/N): " continue_search
+        read -p "Would you like to perform another search? (y/N): " continue_search
         if [[ ! "$continue_search" =~ ^[Yy]$ ]]; then
             break
         fi
     done
     
-    print_colored "$GREEN" "プログラムを終了します。ご利用ありがとうございました！"
+    print_colored "$GREEN" "Exiting program. Thank you for using this tool!"
 }
 
 # Run main function if script is executed directly
