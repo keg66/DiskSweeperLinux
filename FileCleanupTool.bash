@@ -116,16 +116,19 @@ format_file_size() {
 # Function to get user input for folder selection
 get_target_folder() {
     while true; do
-        echo ""
-        print_colored "$BLUE" "Please select target folder:"
-        echo "Previous selection: $LAST_FOLDER"
-        echo ""
-        echo "1) Use previous folder ($LAST_FOLDER)"
-        echo "2) Home directory ($HOME)"
-        echo "3) Enter custom path"
-        echo "4) Exit"
-        echo ""
-        read -p "Choice [1-4]: " choice
+        echo "" >&2
+        print_colored "$BLUE" "Please select target folder:" >&2
+        echo "Previous selection: $LAST_FOLDER" >&2
+        echo "" >&2
+        echo "1) Use previous folder ($LAST_FOLDER)" >&2
+        echo "2) Home directory ($HOME)" >&2
+        echo "3) Enter custom path" >&2
+        echo "4) Exit" >&2
+        echo "" >&2
+        if ! read -p "Choice [1-4]: " choice >&2; then
+            print_colored "$YELLOW" "Exiting program." >&2
+            exit 0
+        fi
         
         case $choice in
             1)
@@ -133,7 +136,7 @@ get_target_folder() {
                     echo "$LAST_FOLDER"
                     return 0
                 else
-                    print_colored "$RED" "Error: Folder does not exist: $LAST_FOLDER"
+                    print_colored "$RED" "Error: Folder does not exist: $LAST_FOLDER" >&2
                 fi
                 ;;
             2)
@@ -141,20 +144,23 @@ get_target_folder() {
                 return 0
                 ;;
             3)
-                read -p "Enter target folder path: " custom_path
+                if ! read -p "Enter target folder path: " custom_path >&2; then
+                    print_colored "$YELLOW" "Exiting program." >&2
+                    exit 0
+                fi
                 if [[ -d "$custom_path" ]]; then
                     echo "$custom_path"
                     return 0
                 else
-                    print_colored "$RED" "Error: Folder does not exist: $custom_path"
+                    print_colored "$RED" "Error: Folder does not exist: $custom_path" >&2
                 fi
                 ;;
             4)
-                print_colored "$YELLOW" "Exiting program."
+                print_colored "$YELLOW" "Exiting program." >&2
                 exit 0
                 ;;
             *)
-                print_colored "$RED" "Invalid choice. Please select 1-4."
+                print_colored "$RED" "Invalid choice. Please select 1-4." >&2
                 ;;
         esac
     done
@@ -163,18 +169,21 @@ get_target_folder() {
 # Function to get size threshold from user
 get_size_threshold() {
     while true; do
-        echo ""
-        print_colored "$BLUE" "Please select file size threshold:"
-        echo "Previous selection: $LAST_SIZE_THRESHOLD"
-        echo ""
-        echo "1) 50MB or larger"
-        echo "2) 100MB or larger (recommended)"
-        echo "3) 500MB or larger"
-        echo "4) 1GB or larger"
-        echo "5) Enter custom size"
-        echo "6) Use previous threshold ($LAST_SIZE_THRESHOLD)"
-        echo ""
-        read -p "Choice [1-6]: " choice
+        echo "" >&2
+        print_colored "$BLUE" "Please select file size threshold:" >&2
+        echo "Previous selection: $LAST_SIZE_THRESHOLD" >&2
+        echo "" >&2
+        echo "1) 50MB or larger" >&2
+        echo "2) 100MB or larger (recommended)" >&2
+        echo "3) 500MB or larger" >&2
+        echo "4) 1GB or larger" >&2
+        echo "5) Enter custom size" >&2
+        echo "6) Use previous threshold ($LAST_SIZE_THRESHOLD)" >&2
+        echo "" >&2
+        if ! read -p "Choice [1-6]: " choice >&2; then
+            print_colored "$YELLOW" "Exiting program." >&2
+            exit 0
+        fi
         
         case $choice in
             1) echo "50M"; return 0 ;;
@@ -182,17 +191,20 @@ get_size_threshold() {
             3) echo "500M"; return 0 ;;
             4) echo "1G"; return 0 ;;
             5)
-                read -p "Enter custom size (e.g., 200M, 2G): " custom_size
+                if ! read -p "Enter custom size (e.g., 200M, 2G): " custom_size >&2; then
+                    print_colored "$YELLOW" "Exiting program." >&2
+                    exit 0
+                fi
                 if [[ "$custom_size" =~ ^[0-9]+[MmGgKk]?$ ]]; then
                     echo "$custom_size"
                     return 0
                 else
-                    print_colored "$RED" "Invalid size format. Examples: 200M, 2G"
+                    print_colored "$RED" "Invalid size format. Examples: 200M, 2G" >&2
                 fi
                 ;;
             6) echo "$LAST_SIZE_THRESHOLD"; return 0 ;;
             *)
-                print_colored "$RED" "Invalid choice. Please select 1-6."
+                print_colored "$RED" "Invalid choice. Please select 1-6." >&2
                 ;;
         esac
     done
@@ -213,37 +225,20 @@ search_files() {
     # Reset found files array
     FOUND_FILES=()
     
-    # Show progress during search
-    local search_pid
-    {
-        find "$target_folder" -type f -size +"$size_threshold" -printf "%s|%p|%TY-%Tm-%Td %TH:%TM\n" 2>/dev/null | \
-        sort -nr > "$temp_file"
-    } &
-    search_pid=$!
-    
-    # Show progress indicator
-    local count=0
-    while kill -0 $search_pid 2>/dev/null; do
-        case $((count % 4)) in
-            0) printf "\rSearching |   " ;;
-            1) printf "\rSearching /   " ;;
-            2) printf "\rSearching -   " ;;
-            3) printf "\rSearching \\   " ;;
-        esac
-        ((count++))
-        sleep 0.1
-    done
-    wait $search_pid
+    # Show progress message and search directly
+    printf "Searching for files..."
+    find "$target_folder" -type f -size +"$size_threshold" -exec ls -l {} \; 2>/dev/null | \
+    awk '{print $5 "|" $9 "|" $6 " " $7 " " $8}' | \
+    sed 's/ < \/dev\/null | /|/' | \
+    sort -nr > "$temp_file"
     printf "\rSearch complete!    \n"
     
-    # Read results into array
-    local line_count=0
-    while IFS='|' read -r size filepath modtime; do
-        if [[ -n "$size" && -n "$filepath" ]]; then
-            FOUND_FILES+=("$size|$filepath|$modtime")
-            ((line_count++))
-        fi
-    done < "$temp_file"
+    # Read results into array using mapfile
+    if [[ -s "$temp_file" ]]; then
+        mapfile -t FOUND_FILES < "$temp_file"
+    else
+        FOUND_FILES=()
+    fi
     
     rm -f "$temp_file"
     
@@ -285,75 +280,81 @@ select_files() {
     local selected_indices=()
     
     while true; do
-        echo ""
-        print_colored "$BLUE" "File selection menu:"
-        echo "1) Select/deselect individual files"
-        echo "2) Select all"
-        echo "3) Deselect all"
-        echo "4) Show selected files"
-        echo "5) Delete selected files"
-        echo "6) Return to main menu"
-        echo ""
+        echo "" >&2
+        print_colored "$BLUE" "File selection menu:" >&2
+        echo "1) Select/deselect individual files" >&2
+        echo "2) Select all" >&2
+        echo "3) Deselect all" >&2
+        echo "4) Show selected files" >&2
+        echo "5) Delete selected files" >&2
+        echo "6) Return to main menu" >&2
+        echo "" >&2
         
         if [[ ${#selected_indices[@]} -gt 0 ]]; then
-            print_colored "$GREEN" "Currently ${#selected_indices[@]} files are selected"
+            print_colored "$GREEN" "Currently ${#selected_indices[@]} files are selected" >&2
         fi
         
-        read -p "Choice [1-6]: " choice
+        if ! read -p "Choice [1-6]: " choice >&2; then
+            print_colored "$YELLOW" "Exiting program." >&2
+            exit 0
+        fi
         
         case $choice in
             1)
-                echo ""
-                read -p "Enter file number (1-${#FOUND_FILES[@]}): " file_num
+                echo "" >&2
+                if ! read -p "Enter file number (1-${#FOUND_FILES[@]}): " file_num >&2; then
+                    print_colored "$YELLOW" "Exiting program." >&2
+                    exit 0
+                fi
                 if [[ "$file_num" =~ ^[0-9]+$ ]] && (( file_num >= 1 && file_num <= ${#FOUND_FILES[@]} )); then
                     # Toggle selection
                     local index=$((file_num - 1))
                     if [[ " ${selected_indices[*]} " =~ " ${index} " ]]; then
                         # Remove from selection
                         selected_indices=(${selected_indices[@]/$index})
-                        print_colored "$YELLOW" "Deselected file $file_num"
+                        print_colored "$YELLOW" "Deselected file $file_num" >&2
                     else
                         # Add to selection
                         selected_indices+=("$index")
-                        print_colored "$GREEN" "Selected file $file_num"
+                        print_colored "$GREEN" "Selected file $file_num" >&2
                     fi
                 else
-                    print_colored "$RED" "Invalid file number"
+                    print_colored "$RED" "Invalid file number" >&2
                 fi
                 ;;
             2)
                 selected_indices=($(seq 0 $((${#FOUND_FILES[@]} - 1))))
-                print_colored "$GREEN" "Selected all files (${#FOUND_FILES[@]} files)"
+                print_colored "$GREEN" "Selected all files (${#FOUND_FILES[@]} files)" >&2
                 ;;
             3)
                 selected_indices=()
-                print_colored "$YELLOW" "Deselected all files"
+                print_colored "$YELLOW" "Deselected all files" >&2
                 ;;
             4)
                 if [[ ${#selected_indices[@]} -eq 0 ]]; then
-                    print_colored "$YELLOW" "No files are selected"
+                    print_colored "$YELLOW" "No files are selected" >&2
                 else
-                    echo ""
-                    echo "Selected files:"
-                    echo "----------------------------------------"
+                    echo "" >&2
+                    echo "Selected files:" >&2
+                    echo "----------------------------------------" >&2
                     local total_size=0
                     for index in "${selected_indices[@]}"; do
                         local file_info="${FOUND_FILES[$index]}"
                         IFS='|' read -r size filepath modtime <<< "$file_info"
                         local human_size
                         human_size=$(format_file_size "$size")
-                        printf "%-10s %-19s %s\n" "$human_size" "$modtime" "$filepath"
+                        printf "%-10s %-19s %s\n" "$human_size" "$modtime" "$filepath" >&2
                         total_size=$((total_size + size))
                     done
-                    echo "----------------------------------------"
+                    echo "----------------------------------------" >&2
                     local total_human_size
                     total_human_size=$(format_file_size "$total_size")
-                    print_colored "$GREEN" "Total size: $total_human_size"
+                    print_colored "$GREEN" "Total size: $total_human_size" >&2
                 fi
                 ;;
             5)
                 if [[ ${#selected_indices[@]} -eq 0 ]]; then
-                    print_colored "$RED" "No files selected for deletion"
+                    print_colored "$RED" "No files selected for deletion" >&2
                 else
                     delete_selected_files "${selected_indices[@]}"
                     return 0
@@ -363,7 +364,7 @@ select_files() {
                 return 0
                 ;;
             *)
-                print_colored "$RED" "Invalid choice. Please select 1-6."
+                print_colored "$RED" "Invalid choice. Please select 1-6." >&2
                 ;;
         esac
     done
@@ -384,36 +385,39 @@ delete_selected_files() {
     done
     
     # Show confirmation
-    echo ""
-    print_colored "$YELLOW" "Delete confirmation"
-    echo "----------------------------------------"
-    print_colored "$RED" "The following ${#SELECTED_FILES[@]} files will be moved to trash:"
+    echo "" >&2
+    print_colored "$YELLOW" "Delete confirmation" >&2
+    echo "----------------------------------------" >&2
+    print_colored "$RED" "The following ${#SELECTED_FILES[@]} files will be moved to trash:" >&2
     
     for filepath in "${SELECTED_FILES[@]}"; do
-        echo "  $filepath"
+        echo "  $filepath" >&2
     done
     
     local total_human_size
     total_human_size=$(format_file_size "$total_size")
-    echo "----------------------------------------"
-    print_colored "$BLUE" "Total deletion size: $total_human_size"
-    echo ""
+    echo "----------------------------------------" >&2
+    print_colored "$BLUE" "Total deletion size: $total_human_size" >&2
+    echo "" >&2
     
-    read -p "Are you sure you want to delete? (y/N): " confirm
+    if ! read -p "Are you sure you want to delete? (y/N): " confirm >&2; then
+        print_colored "$YELLOW" "Delete operation cancelled." >&2
+        return 0
+    fi
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         local success_count=0
         local error_count=0
         
-        print_colored "$YELLOW" "Moving files to trash..."
+        print_colored "$YELLOW" "Moving files to trash..." >&2
         
         for filepath in "${SELECTED_FILES[@]}"; do
             if command -v gio >/dev/null 2>&1; then
                 if gio trash "$filepath" 2>/dev/null; then
                     ((success_count++))
-                    print_colored "$GREEN" "Move completed: $(basename "$filepath")"
+                    print_colored "$GREEN" "Move completed: $(basename "$filepath")" >&2
                 else
                     ((error_count++))
-                    print_colored "$RED" "Move failed: $filepath"
+                    print_colored "$RED" "Move failed: $filepath" >&2
                 fi
             else
                 # Fallback: move to a trash directory
@@ -421,22 +425,22 @@ delete_selected_files() {
                 mkdir -p "$trash_dir"
                 if mv "$filepath" "$trash_dir/" 2>/dev/null; then
                     ((success_count++))
-                    print_colored "$GREEN" "Move completed: $(basename "$filepath")"
+                    print_colored "$GREEN" "Move completed: $(basename "$filepath")" >&2
                 else
                     ((error_count++))
-                    print_colored "$RED" "Move failed: $filepath"
+                    print_colored "$RED" "Move failed: $filepath" >&2
                 fi
             fi
         done
         
-        echo ""
-        print_colored "$GREEN" "Delete operation completed!"
-        print_colored "$BLUE" "Success: $success_count files"
+        echo "" >&2
+        print_colored "$GREEN" "Delete operation completed!" >&2
+        print_colored "$BLUE" "Success: $success_count files" >&2
         if [[ $error_count -gt 0 ]]; then
-            print_colored "$RED" "Failed: $error_count files"
+            print_colored "$RED" "Failed: $error_count files" >&2
         fi
     else
-        print_colored "$YELLOW" "Delete operation cancelled."
+        print_colored "$YELLOW" "Delete operation cancelled." >&2
     fi
 }
 
@@ -501,7 +505,9 @@ main() {
         
         # Ask if user wants to continue
         echo ""
-        read -p "Would you like to perform another search? (y/N): " continue_search
+        if ! read -p "Would you like to perform another search? (y/N): " continue_search; then
+            break
+        fi
         if [[ ! "$continue_search" =~ ^[Yy]$ ]]; then
             break
         fi
