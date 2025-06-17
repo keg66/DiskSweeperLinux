@@ -68,7 +68,7 @@ The tool provides an interactive menu system in Japanese:
    - Use previous threshold
 
 3. **File Selection**: Choose files to delete
-   - Individual file selection/deselection
+   - Multiple file selection/deselection (single, multiple, ranges)
    - Select all files
    - Deselect all files
    - View selected files
@@ -84,6 +84,23 @@ When entering a custom folder path:
 - **Tilde Expansion**: Use `~` as shorthand for home directory
   - Example: `~/Documents` expands to `/home/username/Documents`
 - **Real-time Validation**: Immediate feedback if path doesn't exist
+
+### Multiple File Selection
+
+When selecting files for deletion, you can use various input formats:
+
+- **Single file**: `5` - Select/deselect file number 5
+- **Multiple files**: `1,3,5` - Select/deselect files 1, 3, and 5
+- **Range selection**: `2-7` - Select/deselect files 2 through 7
+- **Mixed format**: `1,3,5-8` - Select/deselect file 1, 3, and files 5 through 8
+
+**Examples:**
+```
+Enter file number(s): 1,3,5      # Select files 1, 3, and 5
+Enter file number(s): 2-7        # Select files 2 through 7
+Enter file number(s): 1,3,5-8    # Select file 1, 3, and files 5-8
+Enter file number(s): 10         # Toggle selection of file 10
+```
 
 ## Configuration
 

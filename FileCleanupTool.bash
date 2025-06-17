@@ -285,6 +285,106 @@ display_files() {
     echo ""
 }
 
+# Function to process file selection input
+process_file_selection() {
+    local file_input="$1"
+    local parsed_numbers=()
+    local valid_input=true
+    
+    # Clean input by removing all spaces first
+    file_input=$(echo "$file_input" | tr -d ' ')
+    
+    # Parse different input formats
+    if [[ "$file_input" =~ ^[0-9,\-]+$ ]]; then
+        # Split by comma and process each part
+        IFS=',' read -ra parts <<< "$file_input"
+        for part in "${parts[@]}"; do
+            part=$(echo "$part" | tr -d ' ')  # Remove spaces
+            if [[ "$part" =~ ^[0-9]+$ ]]; then
+                # Single number
+                if (( part >= 1 && part <= ${#FOUND_FILES[@]} )); then
+                    parsed_numbers+=("$part")
+                else
+                    valid_input=false
+                    break
+                fi
+            elif [[ "$part" =~ ^[0-9]+-[0-9]+$ ]]; then
+                # Range (e.g., 2-5)
+                local start=${part%-*}
+                local end=${part#*-}
+                if (( start >= 1 && end <= ${#FOUND_FILES[@]} && start <= end )); then
+                    for ((i=start; i<=end; i++)); do
+                        parsed_numbers+=("$i")
+                    done
+                else
+                    valid_input=false
+                    break
+                fi
+            else
+                valid_input=false
+                break
+            fi
+        done
+    else
+        valid_input=false
+    fi
+    
+    if [[ "$valid_input" == true && ${#parsed_numbers[@]} -gt 0 ]]; then
+        # Remove duplicates
+        local unique_numbers=($(printf '%s\n' "${parsed_numbers[@]}" | sort -nu))
+        local selected_count=0
+        local deselected_count=0
+        
+        for file_num in "${unique_numbers[@]}"; do
+            local index=$((file_num - 1))
+            local is_selected=false
+            
+            # Check if index is already selected
+            if [[ ${#selected_indices[@]} -gt 0 ]]; then
+                for selected_idx in "${selected_indices[@]}"; do
+                    if [[ "$selected_idx" == "$index" ]]; then
+                        is_selected=true
+                        break
+                    fi
+                done
+            fi
+            
+            if [[ "$is_selected" == true ]]; then
+                # Remove from selection
+                local new_indices=()
+                if [[ ${#selected_indices[@]} -gt 0 ]]; then
+                    for selected_idx in "${selected_indices[@]}"; do
+                        if [[ "$selected_idx" != "$index" ]]; then
+                            new_indices+=("$selected_idx")
+                        fi
+                    done
+                fi
+                if [[ ${#new_indices[@]} -gt 0 ]]; then
+                    selected_indices=("${new_indices[@]}")
+                else
+                    selected_indices=()
+                fi
+                unset new_indices
+                deselected_count=$((deselected_count + 1))
+            else
+                # Add to selection
+                selected_indices+=("$index")
+                selected_count=$((selected_count + 1))
+            fi
+        done
+        
+        if [[ $selected_count -gt 0 && $deselected_count -gt 0 ]]; then
+            print_colored "$BLUE" "Selected $selected_count files, deselected $deselected_count files" >&2
+        elif [[ $selected_count -gt 0 ]]; then
+            print_colored "$GREEN" "Selected $selected_count files" >&2
+        elif [[ $deselected_count -gt 0 ]]; then
+            print_colored "$YELLOW" "Deselected $deselected_count files" >&2
+        fi
+    else
+        print_colored "$RED" "Invalid input format. Use: single number, comma-separated, or ranges (e.g., 1,3,5-8)" >&2
+    fi
+}
+
 # Function for file selection interface
 select_files() {
     if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
@@ -298,7 +398,7 @@ select_files() {
     while true; do
         echo "" >&2
         print_colored "$BLUE" "File selection menu:" >&2
-        echo "1) Select/deselect individual files" >&2
+        echo "1) Select/deselect files (single or multiple)" >&2
         echo "2) Select all" >&2
         echo "3) Deselect all" >&2
         echo "4) Show selected files" >&2
@@ -310,33 +410,45 @@ select_files() {
             print_colored "$GREEN" "Currently ${#selected_indices[@]} files are selected" >&2
         fi
         
+        # Clear input buffer and ensure clean read
+        read -t 0.1 -n 10000 discard 2>/dev/null || true
         if ! read -p "Choice [1-6]: " choice >&2; then
             print_colored "$YELLOW" "Exiting program." >&2
             exit 0
         fi
         
+        # Trim whitespace from choice
+        choice=$(echo "$choice" | tr -d ' \t')
+        
+        # Check if user entered file numbers directly (auto-detect file selection pattern)
+        # Exclude single digits 1-6 which are valid menu choices
+        if [[ "$choice" =~ ^[0-9,\-]+$ ]] && [[ ${#FOUND_FILES[@]} -gt 0 ]] && [[ ! "$choice" =~ ^[1-6]$ ]]; then
+            echo "" >&2
+            print_colored "$BLUE" "🔍 Detected file number input: '$choice'" >&2
+            print_colored "$GREEN" "💡 Auto-switching to file selection mode..." >&2
+            echo "" >&2
+            
+            # Process the file numbers directly
+            file_input="$choice"
+            # Jump to file processing logic (we'll extract this to a function)
+            process_file_selection "$file_input"
+            continue
+        fi
+        
         case $choice in
             1)
                 echo "" >&2
-                if ! read -p "Enter file number (1-${#FOUND_FILES[@]}): " file_num >&2; then
+                echo "💡 Examples: '5' (single), '1,3,5' (multiple), '2-7' (range), '1,3,5-8' (mixed)" >&2
+                echo "📝 Now entering file selection mode. Please enter file numbers:" >&2
+                # Clear any remaining input buffer before file number input
+                read -t 0.1 -n 10000 discard 2>/dev/null || true
+                if ! read -e -p "Enter file number(s): " file_input >&2; then
                     print_colored "$YELLOW" "Exiting program." >&2
                     exit 0
                 fi
-                if [[ "$file_num" =~ ^[0-9]+$ ]] && (( file_num >= 1 && file_num <= ${#FOUND_FILES[@]} )); then
-                    # Toggle selection
-                    local index=$((file_num - 1))
-                    if [[ " ${selected_indices[*]} " =~ " ${index} " ]]; then
-                        # Remove from selection
-                        selected_indices=(${selected_indices[@]/$index})
-                        print_colored "$YELLOW" "Deselected file $file_num" >&2
-                    else
-                        # Add to selection
-                        selected_indices+=("$index")
-                        print_colored "$GREEN" "Selected file $file_num" >&2
-                    fi
-                else
-                    print_colored "$RED" "Invalid file number" >&2
-                fi
+                
+                # Process file selection using extracted function
+                process_file_selection "$file_input"
                 ;;
             2)
                 selected_indices=($(seq 0 $((${#FOUND_FILES[@]} - 1))))
@@ -380,7 +492,8 @@ select_files() {
                 return 0
                 ;;
             *)
-                print_colored "$RED" "Invalid choice. Please select 1-6." >&2
+                print_colored "$RED" "Invalid choice '$choice'. Please select 1-6." >&2
+                echo "Note: If you intended to enter file numbers, please select option 1 first." >&2
                 ;;
         esac
     done
