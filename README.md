@@ -56,7 +56,7 @@ The tool provides an interactive menu system in Japanese:
 1. **Folder Selection**: Choose target directory to scan
    - Use previous folder
    - Home directory
-   - Custom path
+   - Custom path (with Tab completion and tilde expansion)
    - Exit
 
 2. **Size Threshold**: Select minimum file size to search for
@@ -74,6 +74,16 @@ The tool provides an interactive menu system in Japanese:
    - View selected files
    - Execute deletion
    - Return to main menu
+
+### Path Input Features
+
+When entering a custom folder path:
+
+- **Tab Completion**: Press Tab to auto-complete directory paths
+  - Example: Type `/ho` and press Tab → completes to `/home/`
+- **Tilde Expansion**: Use `~` as shorthand for home directory
+  - Example: `~/Documents` expands to `/home/username/Documents`
+- **Real-time Validation**: Immediate feedback if path doesn't exist
 
 ## Configuration
 

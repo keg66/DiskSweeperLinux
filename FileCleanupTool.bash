@@ -144,10 +144,13 @@ get_target_folder() {
                 return 0
                 ;;
             3)
-                if ! read -p "Enter target folder path: " custom_path >&2; then
+                echo "💡 Tip: Use Tab key for path completion" >&2
+                if ! read -e -p "Enter target folder path: " custom_path >&2; then
                     print_colored "$YELLOW" "Exiting program." >&2
                     exit 0
                 fi
+                # Expand tilde if present
+                custom_path="${custom_path/#\~/$HOME}"
                 if [[ -d "$custom_path" ]]; then
                     echo "$custom_path"
                     return 0
@@ -191,7 +194,7 @@ get_size_threshold() {
             3) echo "500M"; return 0 ;;
             4) echo "1G"; return 0 ;;
             5)
-                if ! read -p "Enter custom size (e.g., 200M, 2G): " custom_size >&2; then
+                if ! read -e -p "Enter custom size (e.g., 200M, 2G): " custom_size >&2; then
                     print_colored "$YELLOW" "Exiting program." >&2
                     exit 0
                 fi
