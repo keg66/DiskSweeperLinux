@@ -68,7 +68,8 @@ The tool provides an interactive menu system in Japanese:
    - Use previous threshold
 
 3. **File Selection**: Choose files to delete
-   - Multiple file selection/deselection (single, multiple, ranges)
+   - Select files (add to selection) - supports single, multiple, ranges
+   - Deselect files (remove from selection) - supports single, multiple, ranges  
    - Select all files
    - Deselect all files
    - View selected files
