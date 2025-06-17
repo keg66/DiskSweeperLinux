@@ -230,11 +230,24 @@ search_files() {
     
     # Show progress message and search directly
     printf "Searching for files..."
+    
+    # Temporarily disable pipefail to handle permission errors gracefully
+    set +o pipefail
     find "$target_folder" -type f -size +"$size_threshold" -exec ls -l {} \; 2>/dev/null | \
     awk '{print $5 "|" $9 "|" $6 " " $7 " " $8}' | \
     sed 's/ < \/dev\/null | /|/' | \
     sort -nr > "$temp_file"
+    local search_result=$?
+    set -o pipefail
+    
     printf "\rSearch complete!    \n"
+    
+    # Check if search encountered any critical errors (not permission errors)
+    if [[ $search_result -ne 0 && $search_result -ne 141 ]]; then
+        print_colored "$YELLOW" "Note: Some directories were skipped due to permission restrictions."
+        print_colored "$BLUE" "This is normal when scanning home directory with system files."
+        echo ""
+    fi
     
     # Read results into array using mapfile
     if [[ -s "$temp_file" ]]; then

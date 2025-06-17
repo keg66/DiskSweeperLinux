@@ -139,6 +139,7 @@ sudo apt install glib2.0-bin
 - The script runs with regular user permissions
 - Cannot access system files that require admin rights
 - This is by design for safety
+- **Note**: You may see a message about skipped directories - this is normal when scanning directories with restricted access (like system files)
 
 ### Large Directory Scanning
 
