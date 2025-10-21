@@ -236,37 +236,64 @@ search_files() {
 
     # Use find with -size and collect results with real-time progress
     local temp_list=$(mktemp)
+    local temp_all_files=$(mktemp)
     local progress_file=$(mktemp)
 
-    # Start find in background and monitor progress
+    # Start find for all files in background and monitor total count
+    find "$target_folder" -type f -print 2>/dev/null > "$temp_all_files" &
+    local find_all_pid=$!
+
+    # Also find large files
     find "$target_folder" -type f -size +"$size_threshold" -print 2>/dev/null > "$temp_list" &
-    local find_pid=$!
+    local find_large_pid=$!
 
     # Show progress while find is running
-    local count=0
-    while kill -0 $find_pid 2>/dev/null; do
-        if [[ -f "$temp_list" ]]; then
-            count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
-            printf "\rSearching... found %d large files so far  " "$count"
+    local total_count=0
+    local large_count=0
+    local last_total=0
+    local last_large=0
+
+    while kill -0 $find_all_pid 2>/dev/null || kill -0 $find_large_pid 2>/dev/null; do
+        if [[ -f "$temp_all_files" ]]; then
+            total_count=$(wc -l < "$temp_all_files" 2>/dev/null || echo 0)
         fi
-        sleep 0.5
+        if [[ -f "$temp_list" ]]; then
+            large_count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
+        fi
+
+        # Only print if numbers changed
+        if [[ $total_count -ne $last_total || $large_count -ne $last_large ]]; then
+            printf "Scanned: %d files | Found: %d large files\n" "$total_count" "$large_count"
+            last_total=$total_count
+            last_large=$large_count
+        fi
+        sleep 0.3
     done
-    wait $find_pid 2>/dev/null
+
+    wait $find_all_pid 2>/dev/null
+    wait $find_large_pid 2>/dev/null
     local search_result=$?
 
-    # Get final count
-    count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
-    printf "\rSearch complete! Found %d large files          \n" "$count"
+    # Get final counts
+    total_count=$(wc -l < "$temp_all_files" 2>/dev/null || echo 0)
+    large_count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
+    printf "Search complete! Scanned: %d files | Found: %d large files\n" "$total_count" "$large_count"
+
+    rm -f "$temp_all_files"
+    local count=$large_count
 
     # Now process each file to get size and modification time
     if [[ $count -gt 0 ]]; then
         printf "Processing file information...\n"
         local processed=0
+        local last_reported=0
         while IFS= read -r filepath; do
             if [[ -f "$filepath" ]]; then
                 processed=$((processed + 1))
-                if (( processed % 10 == 0 )); then
-                    printf "\rProcessing... %d/%d files  " "$processed" "$count"
+                # Report every 10 files
+                if (( processed % 10 == 0 && processed != last_reported )); then
+                    printf "Processing: %d/%d files (%.0f%%)\n" "$processed" "$count" "$(echo "scale=0; $processed * 100 / $count" | bc)"
+                    last_reported=$processed
                 fi
                 local file_size
                 file_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
@@ -275,7 +302,7 @@ search_files() {
                 echo "$file_size|$filepath|$modtime" >> "$temp_progress"
             fi
         done < "$temp_list"
-        printf "\rProcessed %d files          \n" "$processed"
+        printf "Processed: %d/%d files (100%%)\n" "$processed" "$count"
     fi
 
     set -o pipefail
