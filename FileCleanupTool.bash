@@ -230,12 +230,12 @@ search_files() {
     FOUND_FILES=()
 
     # Count total files first for progress display
-    printf "ファイル数をカウント中..."
+    printf "Counting files..."
     set +o pipefail
     local total_files
     total_files=$(find "$target_folder" -type f 2>/dev/null | wc -l)
     set -o pipefail
-    printf "\r全ファイル数: %d          \n" "$total_files"
+    printf "\rTotal files: %d          \n" "$total_files"
     echo ""
 
     # Show progress message and search with progress display
@@ -245,7 +245,7 @@ search_files() {
         return
     fi
 
-    printf "ファイルを検索中...\n"
+    printf "Searching for files...\n"
 
     # Initialize counter
     local processed=0
@@ -261,7 +261,7 @@ search_files() {
         # Show progress every 100 files
         if (( processed % 100 == 0 )); then
             local percentage=$((processed * 100 / total_files))
-            printf "\r検索中... [%d/%d] (%d%%)  " "$processed" "$total_files" "$percentage"
+            printf "\rSearching... [%d/%d] (%d%%)  " "$processed" "$total_files" "$percentage"
         fi
 
         # Check file size
@@ -286,9 +286,9 @@ search_files() {
 
     # Show final progress
     if (( total_files > 0 )); then
-        printf "\r検索中... [%d/%d] (100%%)  \n" "$processed" "$total_files"
+        printf "\rSearching... [%d/%d] (100%%)  \n" "$processed" "$total_files"
     fi
-    printf "検索完了！\n"
+    printf "Search completed!\n"
 
     # Check if search encountered any critical errors (not permission errors)
     if [[ $search_result -ne 0 && $search_result -ne 141 ]]; then
