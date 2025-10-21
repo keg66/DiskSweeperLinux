@@ -229,47 +229,57 @@ search_files() {
     # Reset found files array
     FOUND_FILES=()
 
-    # Initialize counter
-    local processed=0
-    local found_count=0
-
     printf "Searching for files...\n"
 
     # Temporarily disable pipefail to handle permission errors gracefully
     set +o pipefail
 
-    # Process files one by one with real-time progress display (using process substitution)
-    while IFS= read -r filepath; do
-        ((processed++))
+    # Use find with -size and collect results with real-time progress
+    local temp_list=$(mktemp)
+    local progress_file=$(mktemp)
 
-        # Show progress every 10 files for better visibility
-        if (( processed % 10 == 0 )); then
-            printf "\rScanning... %d files checked  " "$processed"
+    # Start find in background and monitor progress
+    find "$target_folder" -type f -size +"$size_threshold" -print 2>/dev/null > "$temp_list" &
+    local find_pid=$!
+
+    # Show progress while find is running
+    local count=0
+    while kill -0 $find_pid 2>/dev/null; do
+        if [[ -f "$temp_list" ]]; then
+            count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
+            printf "\rSearching... found %d large files so far  " "$count"
         fi
+        sleep 0.5
+    done
+    wait $find_pid 2>/dev/null
+    local search_result=$?
 
-        # Check file size
-        if [[ -f "$filepath" ]]; then
-            local file_size
-            file_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
-            local threshold_bytes
-            threshold_bytes=$(size_to_bytes "$size_threshold")
+    # Get final count
+    count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
+    printf "\rSearch complete! Found %d large files          \n" "$count"
 
-            if (( file_size >= threshold_bytes )); then
-                # Get file info
+    # Now process each file to get size and modification time
+    if [[ $count -gt 0 ]]; then
+        printf "Processing file information...\n"
+        local processed=0
+        while IFS= read -r filepath; do
+            if [[ -f "$filepath" ]]; then
+                processed=$((processed + 1))
+                if (( processed % 10 == 0 )); then
+                    printf "\rProcessing... %d/%d files  " "$processed" "$count"
+                fi
+                local file_size
+                file_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
                 local modtime
                 modtime=$(stat -c"%y" "$filepath" 2>/dev/null | cut -d'.' -f1 || echo "unknown")
                 echo "$file_size|$filepath|$modtime" >> "$temp_progress"
-                ((found_count++))
             fi
-        fi
-    done < <(find "$target_folder" -type f 2>/dev/null)
+        done < "$temp_list"
+        printf "\rProcessed %d files          \n" "$processed"
+    fi
 
-    local search_result=$?
     set -o pipefail
-
-    # Show final count
-    printf "\rTotal files scanned: %d          \n" "$processed"
-    printf "Search completed!\n"
+    rm -f "$temp_list" "$progress_file"
 
     # Check if search encountered any critical errors (not permission errors)
     if [[ $search_result -ne 0 && $search_result -ne 141 ]]; then
@@ -288,10 +298,10 @@ search_files() {
 
     rm -f "$temp_file" "$temp_progress"
 
-    if [[ $processed -eq 0 ]]; then
-        print_colored "$YELLOW" "No files found in target directory."
+    if [[ ${#FOUND_FILES[@]} -eq 0 ]]; then
+        print_colored "$YELLOW" "No large files found matching the size threshold."
     else
-        print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found (out of $processed files scanned)"
+        print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found"
     fi
     echo ""
 }
