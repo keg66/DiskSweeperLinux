@@ -229,39 +229,22 @@ search_files() {
     # Reset found files array
     FOUND_FILES=()
 
-    # Count total files first for progress display
-    printf "Counting files..."
-    set +o pipefail
-    local total_files
-    total_files=$(find "$target_folder" -type f 2>/dev/null | wc -l)
-    set -o pipefail
-    printf "\rTotal files: %d          \n" "$total_files"
-    echo ""
-
-    # Show progress message and search with progress display
-    if [[ $total_files -eq 0 ]]; then
-        print_colored "$YELLOW" "No files found in target directory."
-        rm -f "$temp_file" "$temp_progress"
-        return
-    fi
-
-    printf "Searching for files...\n"
-
     # Initialize counter
     local processed=0
     local found_count=0
 
+    printf "Searching for files...\n"
+
     # Temporarily disable pipefail to handle permission errors gracefully
     set +o pipefail
 
-    # Process files one by one with progress display (using process substitution)
+    # Process files one by one with real-time progress display (using process substitution)
     while IFS= read -r filepath; do
         ((processed++))
 
-        # Show progress every 100 files
-        if (( processed % 100 == 0 )); then
-            local percentage=$((processed * 100 / total_files))
-            printf "\rSearching... [%d/%d] (%d%%)  " "$processed" "$total_files" "$percentage"
+        # Show progress every 10 files for better visibility
+        if (( processed % 10 == 0 )); then
+            printf "\rScanning... %d files checked  " "$processed"
         fi
 
         # Check file size
@@ -284,10 +267,8 @@ search_files() {
     local search_result=$?
     set -o pipefail
 
-    # Show final progress
-    if (( total_files > 0 )); then
-        printf "\rSearching... [%d/%d] (100%%)  \n" "$processed" "$total_files"
-    fi
+    # Show final count
+    printf "\rTotal files scanned: %d          \n" "$processed"
     printf "Search completed!\n"
 
     # Check if search encountered any critical errors (not permission errors)
@@ -307,7 +288,11 @@ search_files() {
 
     rm -f "$temp_file" "$temp_progress"
 
-    print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found"
+    if [[ $processed -eq 0 ]]; then
+        print_colored "$YELLOW" "No files found in target directory."
+    else
+        print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found (out of $processed files scanned)"
+    fi
     echo ""
 }
 
