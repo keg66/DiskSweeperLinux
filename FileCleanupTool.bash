@@ -263,7 +263,7 @@ search_files() {
 
         # Only print if numbers changed
         if [[ $total_count -ne $last_total || $large_count -ne $last_large ]]; then
-            printf "Scanned: %d files | Found: %d large files\n" "$total_count" "$large_count"
+            printf "\rScanned: %d files | Found: %d large files  " "$total_count" "$large_count"
             last_total=$total_count
             last_large=$large_count
         fi
@@ -277,7 +277,7 @@ search_files() {
     # Get final counts
     total_count=$(wc -l < "$temp_all_files" 2>/dev/null || echo 0)
     large_count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
-    printf "Search complete! Scanned: %d files | Found: %d large files\n" "$total_count" "$large_count"
+    printf "\rSearch complete! Scanned: %d files | Found: %d large files          \n" "$total_count" "$large_count"
 
     rm -f "$temp_all_files"
     local count=$large_count
@@ -292,7 +292,7 @@ search_files() {
                 processed=$((processed + 1))
                 # Report every 10 files
                 if (( processed % 10 == 0 && processed != last_reported )); then
-                    printf "Processing: %d/%d files (%.0f%%)\n" "$processed" "$count" "$(echo "scale=0; $processed * 100 / $count" | bc)"
+                    printf "\rProcessing: %d/%d files (%.0f%%)  " "$processed" "$count" "$(echo "scale=0; $processed * 100 / $count" | bc)"
                     last_reported=$processed
                 fi
                 local file_size
@@ -302,7 +302,7 @@ search_files() {
                 echo "$file_size|$filepath|$modtime" >> "$temp_progress"
             fi
         done < "$temp_list"
-        printf "Processed: %d/%d files (100%%)\n" "$processed" "$count"
+        printf "\rProcessed: %d/%d files (100%%)          \n" "$processed" "$count"
     fi
 
     set -o pipefail
