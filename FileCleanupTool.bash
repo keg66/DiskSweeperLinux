@@ -219,45 +219,94 @@ search_files() {
     local size_threshold="$2"
     local temp_file
     temp_file=$(mktemp)
-    
+    local temp_progress=$(mktemp)
+
     print_colored "$YELLOW" "Starting file search..."
     print_colored "$BLUE" "Target folder: $target_folder"
     print_colored "$BLUE" "Size threshold: $size_threshold"
     echo ""
-    
+
     # Reset found files array
     FOUND_FILES=()
-    
-    # Show progress message and search directly
-    printf "Searching for files..."
-    
+
+    # Count total files first for progress display
+    printf "ファイル数をカウント中..."
+    set +o pipefail
+    local total_files
+    total_files=$(find "$target_folder" -type f 2>/dev/null | wc -l)
+    set -o pipefail
+    printf "\r全ファイル数: %d          \n" "$total_files"
+    echo ""
+
+    # Show progress message and search with progress display
+    if [[ $total_files -eq 0 ]]; then
+        print_colored "$YELLOW" "No files found in target directory."
+        rm -f "$temp_file" "$temp_progress"
+        return
+    fi
+
+    printf "ファイルを検索中...\n"
+
+    # Initialize counter
+    local processed=0
+    local found_count=0
+
     # Temporarily disable pipefail to handle permission errors gracefully
     set +o pipefail
-    find "$target_folder" -type f -size +"$size_threshold" -exec ls -l {} \; 2>/dev/null | \
-    awk '{print $5 "|" $9 "|" $6 " " $7 " " $8}' | \
-    sed 's/ < \/dev\/null | /|/' | \
-    sort -nr > "$temp_file"
+
+    # Process files one by one with progress display (using process substitution)
+    while IFS= read -r filepath; do
+        ((processed++))
+
+        # Show progress every 100 files
+        if (( processed % 100 == 0 )); then
+            local percentage=$((processed * 100 / total_files))
+            printf "\r検索中... [%d/%d] (%d%%)  " "$processed" "$total_files" "$percentage"
+        fi
+
+        # Check file size
+        if [[ -f "$filepath" ]]; then
+            local file_size
+            file_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+            local threshold_bytes
+            threshold_bytes=$(size_to_bytes "$size_threshold")
+
+            if (( file_size >= threshold_bytes )); then
+                # Get file info
+                local modtime
+                modtime=$(stat -c"%y" "$filepath" 2>/dev/null | cut -d'.' -f1 || echo "unknown")
+                echo "$file_size|$filepath|$modtime" >> "$temp_progress"
+                ((found_count++))
+            fi
+        fi
+    done < <(find "$target_folder" -type f 2>/dev/null)
+
     local search_result=$?
     set -o pipefail
-    
-    printf "\rSearch complete!    \n"
-    
+
+    # Show final progress
+    if (( total_files > 0 )); then
+        printf "\r検索中... [%d/%d] (100%%)  \n" "$processed" "$total_files"
+    fi
+    printf "検索完了！\n"
+
     # Check if search encountered any critical errors (not permission errors)
     if [[ $search_result -ne 0 && $search_result -ne 141 ]]; then
         print_colored "$YELLOW" "Note: Some directories were skipped due to permission restrictions."
         print_colored "$BLUE" "This is normal when scanning home directory with system files."
         echo ""
     fi
-    
-    # Read results into array using mapfile
-    if [[ -s "$temp_file" ]]; then
+
+    # Sort results by size (largest first) and read into array
+    if [[ -s "$temp_progress" ]]; then
+        sort -t'|' -k1 -nr "$temp_progress" > "$temp_file"
         mapfile -t FOUND_FILES < "$temp_file"
     else
         FOUND_FILES=()
     fi
-    
-    rm -f "$temp_file"
-    
+
+    rm -f "$temp_file" "$temp_progress"
+
     print_colored "$GREEN" "Search results: ${#FOUND_FILES[@]} files found"
     echo ""
 }
