@@ -250,11 +250,15 @@ search_files() {
         idx=0
     } {
         count++
+        # Update spinner on EVERY file for smooth animation
         idx = count % 4
+        # But only show count every 10 files to reduce clutter
         if (count % 10 == 0) {
             printf "\r%s Searching... found %d large files  ", spinner[idx], count > "/dev/stderr"
-            fflush("/dev/stderr")
+        } else {
+            printf "\r%s Searching...  ", spinner[idx] > "/dev/stderr"
         }
+        fflush("/dev/stderr")
     } END {
         printf "\r✓ Search complete! Found %d large files          \n", count > "/dev/stderr"
     }' &
