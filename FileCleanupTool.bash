@@ -238,10 +238,26 @@ search_files() {
     local temp_list=$(mktemp)
     local progress_file=$(mktemp)
 
-    # Start find for large files and monitor with simple counter
+    # Start find for large files with animated progress indicator
     find "$target_folder" -type f -size +"$size_threshold" -print 2>/dev/null | \
     tee "$temp_list" | \
-    awk 'BEGIN {count=0} {count++; if (count % 100 == 0) printf "\rFound: %d large files  ", count > "/dev/stderr"; fflush("/dev/stderr")} END {printf "\rFound: %d large files  \n", count > "/dev/stderr"}' &
+    awk 'BEGIN {
+        count=0
+        spinner[0]="|"
+        spinner[1]="/"
+        spinner[2]="-"
+        spinner[3]="\\"
+        idx=0
+    } {
+        count++
+        idx = count % 4
+        if (count % 10 == 0) {
+            printf "\r%s Searching... found %d large files  ", spinner[idx], count > "/dev/stderr"
+            fflush("/dev/stderr")
+        }
+    } END {
+        printf "\r✓ Search complete! Found %d large files          \n", count > "/dev/stderr"
+    }' &
 
     local find_pid=$!
 
@@ -251,21 +267,27 @@ search_files() {
 
     # Get final count
     local count=$(wc -l < "$temp_list" 2>/dev/null || echo 0)
-    printf "\rSearch complete! Found %d large files          \n" "$count"
+
+    # Only print final count if awk didn't print it (in case of errors)
+    if [[ $search_result -ne 0 ]]; then
+        printf "\rSearch complete! Found %d large files          \n" "$count"
+    fi
 
     # Now process each file to get size and modification time
     if [[ $count -gt 0 ]]; then
         printf "Processing file information...\n"
         local processed=0
         local last_reported=0
+        local spinner_chars=("|" "/" "-" "\\")
         while IFS= read -r filepath; do
             if [[ -f "$filepath" ]]; then
                 processed=$((processed + 1))
-                # Report every 10 files
-                if (( processed % 10 == 0 && processed != last_reported )); then
-                    printf "\rProcessing: %d/%d files (%.0f%%)  " "$processed" "$count" "$(echo "scale=0; $processed * 100 / $count" | bc)"
-                    last_reported=$processed
-                fi
+                # Show animated progress
+                local spinner_idx=$((processed % 4))
+                local spinner="${spinner_chars[$spinner_idx]}"
+                local percentage=$((processed * 100 / count))
+                printf "\r%s Processing: %d/%d files (%d%%)  " "$spinner" "$processed" "$count" "$percentage"
+
                 local file_size
                 file_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
                 local modtime
@@ -273,7 +295,7 @@ search_files() {
                 echo "$file_size|$filepath|$modtime" >> "$temp_progress"
             fi
         done < "$temp_list"
-        printf "\rProcessed: %d/%d files (100%%)          \n" "$processed" "$count"
+        printf "\r✓ Processed: %d/%d files (100%%)          \n" "$processed" "$count"
     fi
 
     set -o pipefail
